@@ -8,6 +8,9 @@ References:
 
 Huge thanks to:
 
+https://github.com/youppgd/esphome-emerson-vertiv-r48
+
 https://github.com/PurpleAlien/R48_Rectifier
+
 
 https://github.com/mb-software/esphome-huawei-r4850
