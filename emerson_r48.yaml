@@ -1,0 +1,128 @@
+esphome:
+  name: batterie_r48
+  friendly_name: batterie_r48
+  min_version: 2025.9.1
+  on_boot:
+    priority: 800.0
+    then:
+      - delay: 5s
+      - logger.log: "Vérification WiFi au boot"
+
+external_components:
+  - source: 
+      type: git
+      url: https://github.com/jon7119/esphomeemerson-vertiv-r48
+      ref: main
+    refresh: 0s
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+  level: DEBUG
+
+api:
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "Esphome-Emerson-Jkbms"
+    password: "*****"
+
+ota:
+  - platform: esphome
+    password: "******"
+    
+web_server:
+
+spi:
+  id: shared_spi
+  clk_pin: GPIO18
+  mosi_pin: GPIO23
+  miso_pin: GPIO19
+
+canbus:
+  - platform: mcp2515
+    id: can
+    spi_id: shared_spi
+    use_extended_id: true
+    cs_pin: GPIO5
+    can_id: 0x0607FF83
+    bit_rate: 125kbps
+    mode: NORMAL
+    data_rate: 10Mhz
+
+emerson_r48:
+  canbus_id: can
+  update_interval: 1s
+
+time:
+  - platform: sntp
+    id: esphome_time
+    servers: pool.ntp.org
+
+switch:
+  - platform: emerson_r48
+    ac_sw:
+      name: "R48 AC switch Turn OFF"
+      restore_mode: ALWAYS_ON
+    dc_sw:
+      name: "R48 DC switch Turn OFF"
+      restore_mode: ALWAYS_ON
+    fan_sw:
+      name: "R48 FAN switch MAX"
+    led_sw:
+      name: "R48 LED switch"
+
+binary_sensor:
+  - platform: status
+    name: "ESP Controller Status"
+
+button:
+
+  - platform: emerson_r48
+    set_offline_values:
+      name: "R48 Set offline values"
+
+  - platform: restart
+    name: "Restart ESP"
+
+number:
+  - platform: emerson_r48
+    output_voltage:
+      name: "R48 Set output voltage"
+    max_output_current:
+      name: "R48 Max output current"
+      unit_of_measurement: '%'
+    max_input_current:
+      name: "R48 Max input current"
+
+sensor:
+  - platform: emerson_r48
+    output_voltage:
+      name: "R48 Output voltage"
+      id: r48_output_voltage
+    output_current:
+      name: "R48 Output current"
+      id: r48_output_current  
+    output_temp:
+      name: "R48 Temperature"
+    input_voltage:
+      name: "R48 AC Voltage"
+    max_output_current:
+      name: "R48 DC max current"
+      unit_of_measurement: '%'
+
+  - platform: template
+    name: outPower
+    id: outpower
+    unit_of_measurement: W
+    device_class: power
+    update_interval: 6s 
+    accuracy_decimals: 2
+    lambda: |-
+      if(id(r48_output_current).state>0) { return ( id(r48_output_current).state * id(r48_output_voltage).state ); } 
+      else {return 0;}
