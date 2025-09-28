@@ -1,0 +1,1 @@
+# esphomeemerson-vertiv-r48
