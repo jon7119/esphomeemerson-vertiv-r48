@@ -434,7 +434,7 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
         if (val1 > 8000 && val1 < 12000) { // Adjusted range for 48V system
           float voltage = val1 / 187.0f;  // 8975 / 187 = 48.0V
           ESP_LOGI(TAG, "Detected voltage: %.2fV (val1=%d)", voltage, val1);
-          if (this->output_voltage_sensor_ != nullptr) {
+          if (this->output_voltage_sensor_ != nullptr && !isnan(voltage) && voltage > 0) {
             this->output_voltage_sensor_->publish_state(voltage);
           }
         }
@@ -445,7 +445,7 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
         if (val2 > 10000 && val2 < 20000) { // Adjusted range for current
           float current = val2 / 5000.0f;  // 13044 / 5000 = 2.61A
           ESP_LOGI(TAG, "Detected current: %.2fA (val2=%d)", current, val2);
-          if (this->output_current_sensor_ != nullptr) {
+          if (this->output_current_sensor_ != nullptr && !isnan(current) && current > 0) {
             this->output_current_sensor_->publish_state(current);
           }
         }
@@ -455,7 +455,7 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
         if (val3 > 150 && val3 < 250) { // Adjusted range for temperature
           float temperature = val3 / 4.0f;  // 193 / 4 = 48.25°C
           ESP_LOGI(TAG, "Detected temperature: %.1f°C (val3=%d)", temperature, val3);
-          if (this->output_temp_sensor_ != nullptr) {
+          if (this->output_temp_sensor_ != nullptr && !isnan(temperature) && temperature > 0) {
             this->output_temp_sensor_->publish_state(temperature);
           }
         }
@@ -498,7 +498,7 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
           }
         }
         
-        // Try parsing current from different byte combinations
+        // Log parsing attempts for debugging but don't publish conflicting values
         if (data.size() >= 8) {
           // Try current from bytes 0-1
           uint16_t current_bytes_01 = (data[0] << 8) | data[1];
@@ -510,21 +510,15 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
           ESP_LOGI(TAG, "Current parsing attempts: bytes01=0x%04x (%d), bytes12=0x%04x (%d), bytes23=0x%04x (%d)", 
                    current_bytes_01, current_bytes_01, current_bytes_12, current_bytes_12, current_bytes_23, current_bytes_23);
           
-          // Try different current scaling factors - only if reasonable range
+          // Only log alternative attempts, don't publish to avoid conflicts
           if (current_bytes_01 > 100 && current_bytes_01 < 5000) {  // 1A to 50A range
             float current = current_bytes_01 / 100.0f;
-            ESP_LOGI(TAG, "Current attempt 1: %.2fA (bytes01=%d)", current, current_bytes_01);
-            if (this->output_current_sensor_ != nullptr) {
-              this->output_current_sensor_->publish_state(current);
-            }
+            ESP_LOGI(TAG, "Current attempt 1: %.2fA (bytes01=%d) - NOT PUBLISHING to avoid conflicts", current, current_bytes_01);
           }
           
           if (current_bytes_12 > 100 && current_bytes_12 < 5000) {  // 1A to 50A range
             float current = current_bytes_12 / 100.0f;
-            ESP_LOGI(TAG, "Current attempt 2: %.2fA (bytes12=%d)", current, current_bytes_12);
-            if (this->output_current_sensor_ != nullptr) {
-              this->output_current_sensor_->publish_state(current);
-            }
+            ESP_LOGI(TAG, "Current attempt 2: %.2fA (bytes12=%d) - NOT PUBLISHING to avoid conflicts", current, current_bytes_12);
           }
         }
       }
