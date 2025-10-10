@@ -70,47 +70,9 @@ void EmersonR48Component::update() {
   // CAN messages are now handled by the YAML on_frame configuration
   ESP_LOGI(TAG, "Update called - CAN messages handled by YAML on_frame");
   
-  // ESPHome 2025.9+ compatibility: Direct CAN message access
-  // Try to read CAN messages directly from the MCP2515 buffer
-  static bool can_polling_active = false;
-  static uint32_t last_can_poll = 0;
-  
-  // Poll CAN messages every 1 second
-  if (millis() - last_can_poll > 1000) {
-    last_can_poll = millis();
-    
-    if (!can_polling_active) {
-      ESP_LOGI(TAG, "Starting direct CAN message polling for ESPHome 2025.9+");
-      can_polling_active = true;
-    }
-    
-    // ESPHome 2025.9+ compatibility: Try to access real CAN messages
-    // We need to find a way to read the actual CAN messages from the Emerson R48
-    ESP_LOGI(TAG, "Attempting to read REAL CAN messages from Emerson R48");
-    
-    // Try to access the CAN bus directly through the MCP2515 driver
-    // This is a workaround for the broken callback system
-    ESP_LOGI(TAG, "Trying to access MCP2515 CAN buffer directly");
-    
-    // The issue: ESPHome 2025.9+ has broken the CAN callback system
-    // Messages are received by the MCP2515 but not delivered to our component
-    ESP_LOGW(TAG, "CAN messages are being received but callbacks are broken");
-    ESP_LOGW(TAG, "This is a known bug in ESPHome 2025.9+");
-    
-    // Alternative approach: Try to use the canbus object directly
-    // This might work if we can access the underlying MCP2515 driver
-    ESP_LOGI(TAG, "Attempting direct CAN bus access...");
-    
-    // Since we can't use exceptions, we'll use a different approach
-    // Try to access the CAN messages through the canbus object
-    if (this->canbus != nullptr) {
-      ESP_LOGI(TAG, "CAN bus object is available, attempting to read messages");
-      // TODO: Find a way to read messages from the canbus object
-      // This requires access to the underlying MCP2515 driver
-    } else {
-      ESP_LOGW(TAG, "CAN bus object is null - this should not happen");
-    }
-  }
+  // ESPHome 2025.9+ compatibility: CAN messages handled by YAML on_frame
+  // The on_frame configuration in YAML should now work correctly
+  ESP_LOGI(TAG, "CAN messages are handled by YAML on_frame configuration");
 
   if (cnt == 1) {
     ESP_LOGD(TAG, "Requesting output voltage message");
