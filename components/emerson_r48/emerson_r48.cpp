@@ -55,25 +55,14 @@ void EmersonR48Component::gimme5(){
 
 
 void EmersonR48Component::setup() {
-  Automation<std::vector<uint8_t>, uint32_t, bool> *automation;
-  LambdaAction<std::vector<uint8_t>, uint32_t, bool> *lambdaaction;
-  canbus::CanbusTrigger *canbus_canbustrigger;
-
-  // catch all received messages
-  canbus_canbustrigger = new canbus::CanbusTrigger(this->canbus, 0, 0, false);
-  canbus_canbustrigger->set_component_source(LOG_STR("canbus"));
-  App.register_component(canbus_canbustrigger);
-  automation = new Automation<std::vector<uint8_t>, uint32_t, bool>(canbus_canbustrigger);
-  auto cb = [this](std::vector<uint8_t> x, uint32_t can_id, bool remote_transmission_request) -> void {
-    ESP_LOGI(TAG, "Callback appelé: ID=0x%x, RTR=%d, Data size=%d", can_id, remote_transmission_request, x.size());
-    this->on_frame(can_id, remote_transmission_request, x);
-  };
-  lambdaaction = new LambdaAction<std::vector<uint8_t>, uint32_t, bool>(cb);
-  automation->add_actions({lambdaaction});
+  // Register callback directly with the CAN bus
+  this->canbus->add_on_frame_callback([this](uint32_t can_id, bool rtr, std::vector<uint8_t> &data) {
+    ESP_LOGI(TAG, "Callback appelé: ID=0x%x, RTR=%d, Data size=%d", can_id, rtr, data.size());
+    this->on_frame(can_id, rtr, data);
+  });
 
   this->sendSync();
   this->gimme5();
-
 }
 
 void EmersonR48Component::update() {
