@@ -479,11 +479,21 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
           }
           
           // Try current with alternative parsing
-          if (alt_val2 > 0 && alt_val2 < 65535) {
+          if (alt_val2 > 100 && alt_val2 < 10000) {  // Reasonable current range 0.1A to 10A
             float current = alt_val2 / 1000.0f;  // Try different scaling
             ESP_LOGI(TAG, "Alternative current: %.3fA (alt_val2=%d)", current, alt_val2);
             if (this->output_current_sensor_ != nullptr) {
               this->output_current_sensor_->publish_state(current);
+              
+              // Calculate power if we have both voltage and current
+              if (this->output_voltage_sensor_ != nullptr && this->output_power_sensor_ != nullptr) {
+                float voltage = this->output_voltage_sensor_->state;
+                if (!isnan(voltage) && voltage > 0) {
+                  float power = voltage * current;
+                  ESP_LOGI(TAG, "Calculated power: %.2fW (%.2fV × %.3fA)", power, voltage, current);
+                  this->output_power_sensor_->publish_state(power);
+                }
+              }
             }
           }
         }
@@ -500,8 +510,8 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
           ESP_LOGI(TAG, "Current parsing attempts: bytes01=0x%04x (%d), bytes12=0x%04x (%d), bytes23=0x%04x (%d)", 
                    current_bytes_01, current_bytes_01, current_bytes_12, current_bytes_12, current_bytes_23, current_bytes_23);
           
-          // Try different current scaling factors
-          if (current_bytes_01 > 0 && current_bytes_01 < 10000) {
+          // Try different current scaling factors - only if reasonable range
+          if (current_bytes_01 > 100 && current_bytes_01 < 5000) {  // 1A to 50A range
             float current = current_bytes_01 / 100.0f;
             ESP_LOGI(TAG, "Current attempt 1: %.2fA (bytes01=%d)", current, current_bytes_01);
             if (this->output_current_sensor_ != nullptr) {
@@ -509,7 +519,7 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
             }
           }
           
-          if (current_bytes_12 > 0 && current_bytes_12 < 10000) {
+          if (current_bytes_12 > 100 && current_bytes_12 < 5000) {  // 1A to 50A range
             float current = current_bytes_12 / 100.0f;
             ESP_LOGI(TAG, "Current attempt 2: %.2fA (bytes12=%d)", current, current_bytes_12);
             if (this->output_current_sensor_ != nullptr) {
