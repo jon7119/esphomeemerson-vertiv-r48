@@ -436,6 +436,7 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
           ESP_LOGI(TAG, "Detected voltage: %.2fV (val1=%d)", voltage, val1);
           if (this->output_voltage_sensor_ != nullptr && !isnan(voltage) && voltage > 0) {
             this->output_voltage_sensor_->publish_state(voltage);
+            this->lastUpdate_ = millis(); // Update timestamp to prevent NAN override
           }
         }
         
@@ -447,6 +448,7 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
           ESP_LOGI(TAG, "Detected current: %.2fA (val2=%d)", current, val2);
           if (this->output_current_sensor_ != nullptr && !isnan(current) && current > 0) {
             this->output_current_sensor_->publish_state(current);
+            this->lastUpdate_ = millis(); // Update timestamp to prevent NAN override
           }
         }
         
@@ -457,6 +459,7 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
           ESP_LOGI(TAG, "Detected temperature: %.1f°C (val3=%d)", temperature, val3);
           if (this->output_temp_sensor_ != nullptr && !isnan(temperature) && temperature > 0) {
             this->output_temp_sensor_->publish_state(temperature);
+            this->lastUpdate_ = millis(); // Update timestamp to prevent NAN override
           }
         }
         
@@ -484,6 +487,7 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
             ESP_LOGI(TAG, "Alternative current: %.3fA (alt_val2=%d)", current, alt_val2);
             if (this->output_current_sensor_ != nullptr) {
               this->output_current_sensor_->publish_state(current);
+              this->lastUpdate_ = millis(); // Update timestamp to prevent NAN override
               
               // Calculate power if we have both voltage and current
               if (this->output_voltage_sensor_ != nullptr && this->output_power_sensor_ != nullptr) {
@@ -492,6 +496,7 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
                   float power = voltage * current;
                   ESP_LOGI(TAG, "Calculated power: %.2fW (%.2fV × %.3fA)", power, voltage, current);
                   this->output_power_sensor_->publish_state(power);
+                  this->lastUpdate_ = millis(); // Update timestamp for power too
                 }
               }
             }
