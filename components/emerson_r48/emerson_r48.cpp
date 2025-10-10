@@ -65,6 +65,7 @@ void EmersonR48Component::setup() {
   App.register_component(canbus_canbustrigger);
   automation = new Automation<std::vector<uint8_t>, uint32_t, bool>(canbus_canbustrigger);
   auto cb = [this](std::vector<uint8_t> x, uint32_t can_id, bool remote_transmission_request) -> void {
+    ESP_LOGI(TAG, "Callback appelé: ID=0x%x, RTR=%d, Data size=%d", can_id, remote_transmission_request, x.size());
     this->on_frame(can_id, remote_transmission_request, x);
   };
   lambdaaction = new LambdaAction<std::vector<uint8_t>, uint32_t, bool>(cb);
@@ -435,4 +436,3 @@ void EmersonR48Component::publish_number_state_(number::Number *number, float va
 //    b = float_to_bytearray(current)
 //    data = [0x03, 0xF0, 0x00, 0x1A, *b]
 //    send_can_message(channel, data)
-
