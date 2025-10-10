@@ -59,6 +59,10 @@ class MCP2515 : public canbus::Canbus,
   MCP2515(){};
   void set_mcp_clock(CanClock clock) { this->mcp_clock_ = clock; };
   void set_mcp_mode(const CanctrlReqopMode mode) { this->mcp_mode_ = mode; }
+  
+  // Public methods for direct CAN access (ESPHome 2025.9+ workaround)
+  bool check_receive_public() { return this->check_receive_(); }
+  canbus::Error read_message_public(struct canbus::CanFrame *frame) { return this->read_message(frame); }
   static const struct TxBnRegs {
     REGISTER CTRL;
     REGISTER SIDH;
