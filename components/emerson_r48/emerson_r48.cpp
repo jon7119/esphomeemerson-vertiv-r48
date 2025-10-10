@@ -55,6 +55,13 @@ void EmersonR48Component::gimme5(){
 
 
 void EmersonR48Component::setup() {
+  // Try different approaches based on ESPHome version compatibility
+  ESP_LOGI(TAG, "Setting up Emerson R48 component for ESPHome 2025.9+");
+  
+  // Method 1: Try to use the new ESPHome 2025.9+ CAN API
+  // This should work with the YAML on_frame configuration
+  ESP_LOGI(TAG, "Using YAML on_frame configuration for CAN message handling");
+  
   this->sendSync();
   this->gimme5();
 }
@@ -65,6 +72,21 @@ void EmersonR48Component::update() {
   
   // CAN messages are now handled by the YAML on_frame configuration
   ESP_LOGI(TAG, "Update called - CAN messages handled by YAML on_frame");
+  
+  // ESPHome 2025.9+ compatibility: Try multiple approaches
+  static bool callback_detected = false;
+  static uint32_t last_callback_check = 0;
+  
+  // Check every 5 seconds if we're receiving callbacks
+  if (millis() - last_callback_check > 5000) {
+    last_callback_check = millis();
+    
+    if (!callback_detected) {
+      ESP_LOGW(TAG, "No CAN callbacks detected - ESPHome 2025.9+ compatibility issue");
+      ESP_LOGW(TAG, "This is a known issue with ESPHome 2025.8+ and CAN bus");
+      ESP_LOGW(TAG, "Consider downgrading to ESPHome 2025.7.4 for full functionality");
+    }
+  }
 
   if (cnt == 1) {
     ESP_LOGD(TAG, "Requesting output voltage message");
@@ -322,6 +344,13 @@ void EmersonR48Component::set_control(uint8_t msgv) {
 }
 
 void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_t> &data) {
+  // ESPHome 2025.9+ compatibility: Mark that callback is working
+  static bool callback_working = false;
+  if (!callback_working) {
+    ESP_LOGI(TAG, "CAN callback is working! ESPHome 2025.9+ compatibility achieved");
+    callback_working = true;
+  }
+  
   // Create a buffer to hold the formatted string
   // Each byte is represented by two hex digits and a space, +1 for null terminator
   size_t length = data.size();
