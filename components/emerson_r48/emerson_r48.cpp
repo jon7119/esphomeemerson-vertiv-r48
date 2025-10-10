@@ -420,28 +420,54 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
         ESP_LOGI(TAG, "Parsed values: val1=0x%04x (%d), val2=0x%04x (%d), val3=0x%02x (%d)", 
                  val1, val1, val2, val2, val3, val3);
         
-        // Try to interpret as voltage/current based on typical ranges
-        if (val1 > 4000 && val1 < 6000) { // Typical voltage range 40-60V
-          float voltage = val1 / 100.0f;
-          ESP_LOGI(TAG, "Detected voltage: %.2fV", voltage);
+        // Try different scaling factors based on observed values
+        // val1=8975, val2=13044, val3=193
+        
+        // Try voltage scaling: 8975 / 1000 = 8.975V (too low)
+        // Try voltage scaling: 8975 / 100 = 89.75V (too high)
+        // Try voltage scaling: 8975 / 200 = 44.875V (reasonable for 48V system)
+        if (val1 > 8000 && val1 < 12000) { // Adjusted range for 48V system
+          float voltage = val1 / 200.0f;
+          ESP_LOGI(TAG, "Detected voltage: %.2fV (val1=%d)", voltage, val1);
           if (this->output_voltage_sensor_ != nullptr) {
             this->output_voltage_sensor_->publish_state(voltage);
           }
         }
         
-        if (val2 > 0 && val2 < 2000) { // Typical current range 0-20A
-          float current = val2 / 100.0f;
-          ESP_LOGI(TAG, "Detected current: %.2fA", current);
+        // Try current scaling: 13044 / 1000 = 13.044A (reasonable)
+        if (val2 > 10000 && val2 < 20000) { // Adjusted range for current
+          float current = val2 / 1000.0f;
+          ESP_LOGI(TAG, "Detected current: %.2fA (val2=%d)", current, val2);
           if (this->output_current_sensor_ != nullptr) {
             this->output_current_sensor_->publish_state(current);
           }
         }
         
-        if (val3 > 0 && val3 < 100) { // Typical temperature range 0-100°C
-          float temperature = val3;
-          ESP_LOGI(TAG, "Detected temperature: %.1f°C", temperature);
+        // Try temperature scaling: 193 / 2 = 96.5°C (reasonable)
+        if (val3 > 150 && val3 < 250) { // Adjusted range for temperature
+          float temperature = val3 / 2.0f;
+          ESP_LOGI(TAG, "Detected temperature: %.1f°C (val3=%d)", temperature, val3);
           if (this->output_temp_sensor_ != nullptr) {
             this->output_temp_sensor_->publish_state(temperature);
+          }
+        }
+        
+        // Also try alternative parsing with different byte positions
+        if (data.size() >= 8) {
+          // Try parsing from different positions
+          uint16_t alt_val1 = (data[4] << 8) | data[5];
+          uint16_t alt_val2 = (data[6] << 8) | data[7];
+          
+          ESP_LOGI(TAG, "Alternative parsing: alt_val1=0x%04x (%d), alt_val2=0x%04x (%d)", 
+                   alt_val1, alt_val1, alt_val2, alt_val2);
+          
+          // Try voltage with alternative parsing
+          if (alt_val1 > 4000 && alt_val1 < 6000) {
+            float voltage = alt_val1 / 100.0f;
+            ESP_LOGI(TAG, "Alternative voltage: %.2fV", voltage);
+            if (this->output_voltage_sensor_ != nullptr) {
+              this->output_voltage_sensor_->publish_state(voltage);
+            }
           }
         }
       }
