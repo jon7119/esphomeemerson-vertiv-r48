@@ -4,6 +4,7 @@
 #include "esphome/core/automation.h"
 #include "esphome/core/component.h"
 #include "esphome/core/log.h"
+#include "esphome/components/mcp2515/mcp2515.h"
 
 namespace esphome {
 namespace emerson_r48 {
@@ -67,12 +68,55 @@ void EmersonR48Component::update() {
   static uint8_t cnt = 0;
   cnt++;
   
-  // CAN messages are now handled by the YAML on_frame configuration
-  ESP_LOGI(TAG, "Update called - CAN messages handled by YAML on_frame");
+  // ESPHome 2025.9+ compatibility: Direct CAN message polling
+  // Since on_frame YAML doesn't work with extended IDs, we poll directly
+  ESP_LOGI(TAG, "Update called - Direct CAN polling for ESPHome 2025.9+");
   
-  // ESPHome 2025.9+ compatibility: CAN messages handled by YAML on_frame
-  // The on_frame configuration in YAML should now work correctly
-  ESP_LOGI(TAG, "CAN messages are handled by YAML on_frame configuration");
+  // Try to read CAN messages directly from the MCP2515 buffer
+  // This is a workaround for the broken callback system in ESPHome 2025.9+
+  static uint32_t last_can_check = 0;
+  if (millis() - last_can_check > 100) { // Check every 100ms
+    last_can_check = millis();
+    
+    // Attempt to read CAN messages directly
+    // We know messages are being received (we see them in logs)
+    // but the callback system is broken in ESPHome 2025.9+
+    ESP_LOGI(TAG, "Polling for CAN messages from Emerson R48");
+    
+    // Try to access the MCP2515 driver directly to read real CAN messages
+    // This is the only way to get real data with ESPHome 2025.9+ callback issues
+    ESP_LOGI(TAG, "Attempting to read REAL CAN messages from MCP2515 driver");
+    
+    // Cast the canbus to MCP2515 to access direct methods
+    auto* mcp2515 = static_cast<mcp2515::MCP2515*>(this->canbus);
+    if (mcp2515 != nullptr) {
+      // Check if there are messages available
+      if (mcp2515->check_receive_()) {
+        ESP_LOGI(TAG, "CAN messages available! Reading directly from MCP2515");
+        
+        // Read the message directly
+        struct canbus::CanFrame frame;
+        canbus::Error result = mcp2515->read_message(&frame);
+        
+        if (result == canbus::ERROR_OK) {
+          ESP_LOGI(TAG, "Successfully read CAN message: ID=0x%x, DLC=%d", 
+                   frame.can_id, frame.can_data_length_code);
+          
+          // Convert to vector for our parsing function
+          std::vector<uint8_t> data(frame.data, frame.data + frame.can_data_length_code);
+          
+          // Call our parsing function with the real data
+          this->on_frame(frame.can_id, frame.remote_transmission_request, data);
+        } else {
+          ESP_LOGW(TAG, "Failed to read CAN message: %d", result);
+        }
+      } else {
+        ESP_LOGD(TAG, "No CAN messages available");
+      }
+    } else {
+      ESP_LOGW(TAG, "Cannot cast canbus to MCP2515 - wrong driver type");
+    }
+  }
 
   if (cnt == 1) {
     ESP_LOGD(TAG, "Requesting output voltage message");
@@ -328,6 +372,7 @@ void EmersonR48Component::set_control(uint8_t msgv) {
   // Log the entire line
   ESP_LOGD(TAG, "sent control can_message.data: %s", buffer);
 }
+
 
 void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_t> &data) {
   // ESPHome 2025.9+ compatibility: Mark that callback is working
