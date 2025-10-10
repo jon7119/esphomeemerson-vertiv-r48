@@ -347,9 +347,9 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
   }
 
   // Log the entire line
-    ESP_LOGD(TAG, "received can_message ID=0x%x data: %s", can_id, buffer);
+  ESP_LOGD(TAG, "received can_message ID=0x%x data: %s", can_id, buffer);
 
-  if (can_id == CAN_ID_DATA) {
+  if (can_id == CAN_ID_DATA || can_id == 0x707f803) {
     uint32_t value = (data[4] << 24) + (data[5] << 16) + (data[6] << 8) + data[7];
     float conv_value = 0;
     memcpy(&conv_value, &value, sizeof(conv_value));
@@ -434,5 +434,4 @@ void EmersonR48Component::publish_number_state_(number::Number *number, float va
 //def limit_input(channel, current):
 //    b = float_to_bytearray(current)
 //    data = [0x03, 0xF0, 0x00, 0x1A, *b]
-
 //    send_can_message(channel, data)
