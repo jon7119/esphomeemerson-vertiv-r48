@@ -55,11 +55,17 @@ void EmersonR48Component::gimme5(){
 
 
 void EmersonR48Component::setup() {
-  // Register callback directly with the CAN bus
-  this->canbus->add_on_frame_callback([this](uint32_t can_id, bool rtr, std::vector<uint8_t> &data) {
+  // Use CanbusTrigger with correct syntax for extended IDs
+  auto trigger = new canbus::CanbusTrigger(this->canbus, 0, 0, true); // true for extended IDs
+  trigger->set_component_source(LOG_STR("canbus"));
+  App.register_component(trigger);
+  
+  auto automation = new Automation<std::vector<uint8_t>, uint32_t, bool>(trigger);
+  auto lambda_action = new LambdaAction<std::vector<uint8_t>, uint32_t, bool>([this](std::vector<uint8_t> data, uint32_t can_id, bool rtr) {
     ESP_LOGI(TAG, "Callback appelé: ID=0x%x, RTR=%d, Data size=%d", can_id, rtr, data.size());
     this->on_frame(can_id, rtr, data);
   });
+  automation->add_actions({lambda_action});
 
   this->sendSync();
   this->gimme5();
