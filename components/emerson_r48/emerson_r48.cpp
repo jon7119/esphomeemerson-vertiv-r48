@@ -396,6 +396,59 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
   ESP_LOGI(TAG, "received can_message ID=0x%x data: %s", can_id, buffer);
 
   if (can_id == CAN_ID_DATA || can_id == 0x707f803) {
+    ESP_LOGI(TAG, "Parsing CAN message ID=0x%x, data[3]=0x%02x", can_id, data[3]);
+    
+    // Handle status messages (0x707f803) differently from data messages
+    if (can_id == 0x707f803) {
+      ESP_LOGI(TAG, "Status message received - parsing status data");
+      
+      // Parse status message format
+      // Format: [cmd][status][param][value1][value2][value3][value4][value5]
+      uint8_t cmd = data[0];
+      uint8_t status = data[1];
+      uint8_t param = data[2];
+      
+      ESP_LOGI(TAG, "Status: cmd=0x%02x, status=0x%02x, param=0x%02x", cmd, status, param);
+      
+      // Try to extract values from different positions
+      if (data.size() >= 8) {
+        // Try different parsing approaches
+        uint16_t val1 = (data[3] << 8) | data[4];
+        uint16_t val2 = (data[5] << 8) | data[6];
+        uint8_t val3 = data[7];
+        
+        ESP_LOGI(TAG, "Parsed values: val1=0x%04x (%d), val2=0x%04x (%d), val3=0x%02x (%d)", 
+                 val1, val1, val2, val2, val3, val3);
+        
+        // Try to interpret as voltage/current based on typical ranges
+        if (val1 > 4000 && val1 < 6000) { // Typical voltage range 40-60V
+          float voltage = val1 / 100.0f;
+          ESP_LOGI(TAG, "Detected voltage: %.2fV", voltage);
+          if (this->output_voltage_sensor_ != nullptr) {
+            this->output_voltage_sensor_->publish_state(voltage);
+          }
+        }
+        
+        if (val2 > 0 && val2 < 2000) { // Typical current range 0-20A
+          float current = val2 / 100.0f;
+          ESP_LOGI(TAG, "Detected current: %.2fA", current);
+          if (this->output_current_sensor_ != nullptr) {
+            this->output_current_sensor_->publish_state(current);
+          }
+        }
+        
+        if (val3 > 0 && val3 < 100) { // Typical temperature range 0-100°C
+          float temperature = val3;
+          ESP_LOGI(TAG, "Detected temperature: %.1f°C", temperature);
+          if (this->output_temp_sensor_ != nullptr) {
+            this->output_temp_sensor_->publish_state(temperature);
+          }
+        }
+      }
+      return;
+    }
+    
+    // Original parsing for data messages
     uint32_t value = (data[4] << 24) + (data[5] << 16) + (data[6] << 8) + data[7];
     float conv_value = 0;
     memcpy(&conv_value, &value, sizeof(conv_value));
