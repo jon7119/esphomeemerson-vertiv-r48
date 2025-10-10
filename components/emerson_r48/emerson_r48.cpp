@@ -4,7 +4,6 @@
 #include "esphome/core/automation.h"
 #include "esphome/core/component.h"
 #include "esphome/core/log.h"
-#include "esphome/components/mcp2515/mcp2515.h"
 
 namespace esphome {
 namespace emerson_r48 {
@@ -87,34 +86,24 @@ void EmersonR48Component::update() {
     // This is the only way to get real data with ESPHome 2025.9+ callback issues
     ESP_LOGI(TAG, "Attempting to read REAL CAN messages from MCP2515 driver");
     
-    // Cast the canbus to MCP2515 to access direct methods
-    auto* mcp2515 = static_cast<mcp2515::MCP2515*>(this->canbus);
-    if (mcp2515 != nullptr) {
-      // Check if there are messages available
-      if (mcp2515->check_receive_()) {
-        ESP_LOGI(TAG, "CAN messages available! Reading directly from MCP2515");
-        
-        // Read the message directly
-        struct canbus::CanFrame frame;
-        canbus::Error result = mcp2515->read_message(&frame);
-        
-        if (result == canbus::ERROR_OK) {
-          ESP_LOGI(TAG, "Successfully read CAN message: ID=0x%x, DLC=%d", 
-                   frame.can_id, frame.can_data_length_code);
-          
-          // Convert to vector for our parsing function
-          std::vector<uint8_t> data(frame.data, frame.data + frame.can_data_length_code);
-          
-          // Call our parsing function with the real data
-          this->on_frame(frame.can_id, frame.remote_transmission_request, data);
-        } else {
-          ESP_LOGW(TAG, "Failed to read CAN message: %d", result);
-        }
-      } else {
-        ESP_LOGD(TAG, "No CAN messages available");
-      }
+    // Use the public canbus interface to read messages
+    // This works with any canbus implementation (MCP2515, ESP32_CAN, etc.)
+    struct canbus::CanFrame frame;
+    canbus::Error result = this->canbus->read_message(&frame);
+    
+    if (result == canbus::ERROR_OK) {
+      ESP_LOGI(TAG, "Successfully read REAL CAN message: ID=0x%x, DLC=%d", 
+               frame.can_id, frame.can_data_length_code);
+      
+      // Convert to vector for our parsing function
+      std::vector<uint8_t> data(frame.data, frame.data + frame.can_data_length_code);
+      
+      // Call our parsing function with the REAL data from Emerson R48
+      this->on_frame(frame.can_id, frame.remote_transmission_request, data);
+    } else if (result == canbus::ERROR_NOMSG) {
+      ESP_LOGD(TAG, "No CAN messages available");
     } else {
-      ESP_LOGW(TAG, "Cannot cast canbus to MCP2515 - wrong driver type");
+      ESP_LOGW(TAG, "Failed to read CAN message: %d", result);
     }
   }
 
