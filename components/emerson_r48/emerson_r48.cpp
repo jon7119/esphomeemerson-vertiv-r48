@@ -55,19 +55,6 @@ void EmersonR48Component::gimme5(){
 
 
 void EmersonR48Component::setup() {
-  // Use CanbusTrigger with the correct configuration for extended IDs
-  auto trigger = new canbus::CanbusTrigger(this->canbus, 0, 0, true); // true for extended IDs
-  trigger->set_component_source(LOG_STR("canbus"));
-  App.register_component(trigger);
-  
-  // Create automation to handle CAN frames
-  auto automation = new Automation<std::vector<uint8_t>, uint32_t, bool>(trigger);
-  auto lambda_action = new LambdaAction<std::vector<uint8_t>, uint32_t, bool>([this](std::vector<uint8_t> data, uint32_t can_id, bool rtr) {
-    ESP_LOGI(TAG, "CAN callback triggered: ID=0x%x, RTR=%d, Data size=%d", can_id, rtr, data.size());
-    this->on_frame(can_id, rtr, data);
-  });
-  automation->add_actions({lambda_action});
-
   this->sendSync();
   this->gimme5();
 }
@@ -76,9 +63,8 @@ void EmersonR48Component::update() {
   static uint8_t cnt = 0;
   cnt++;
   
-  // Simulate callback for debugging - parse messages manually
-  // This is a workaround since CanbusTrigger doesn't work properly
-  ESP_LOGI(TAG, "Update called - checking for CAN messages manually");
+  // CAN messages are now handled by the YAML on_frame configuration
+  ESP_LOGI(TAG, "Update called - CAN messages handled by YAML on_frame");
 
   if (cnt == 1) {
     ESP_LOGD(TAG, "Requesting output voltage message");
