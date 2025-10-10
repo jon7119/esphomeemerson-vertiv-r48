@@ -90,22 +90,25 @@ void EmersonR48Component::update() {
     
     // Try to access the CAN bus directly through the MCP2515 driver
     // This is a workaround for the broken callback system
-    try {
-      // Attempt to read CAN messages directly from the MCP2515
-      // We know the messages are there because we see them in the logs
-      ESP_LOGI(TAG, "Trying to access MCP2515 CAN buffer directly");
-      
-      // The issue: ESPHome 2025.9+ has broken the CAN callback system
-      // Messages are received by the MCP2515 but not delivered to our component
-      ESP_LOGW(TAG, "CAN messages are being received but callbacks are broken");
-      ESP_LOGW(TAG, "This is a known bug in ESPHome 2025.9+");
-      
-      // Alternative approach: Try to use the canbus object directly
-      // This might work if we can access the underlying MCP2515 driver
-      ESP_LOGI(TAG, "Attempting direct CAN bus access...");
-      
-    } catch (const std::exception& e) {
-      ESP_LOGW(TAG, "Failed to access CAN messages directly: %s", e.what());
+    ESP_LOGI(TAG, "Trying to access MCP2515 CAN buffer directly");
+    
+    // The issue: ESPHome 2025.9+ has broken the CAN callback system
+    // Messages are received by the MCP2515 but not delivered to our component
+    ESP_LOGW(TAG, "CAN messages are being received but callbacks are broken");
+    ESP_LOGW(TAG, "This is a known bug in ESPHome 2025.9+");
+    
+    // Alternative approach: Try to use the canbus object directly
+    // This might work if we can access the underlying MCP2515 driver
+    ESP_LOGI(TAG, "Attempting direct CAN bus access...");
+    
+    // Since we can't use exceptions, we'll use a different approach
+    // Try to access the CAN messages through the canbus object
+    if (this->canbus != nullptr) {
+      ESP_LOGI(TAG, "CAN bus object is available, attempting to read messages");
+      // TODO: Find a way to read messages from the canbus object
+      // This requires access to the underlying MCP2515 driver
+    } else {
+      ESP_LOGW(TAG, "CAN bus object is null - this should not happen");
     }
   }
 
