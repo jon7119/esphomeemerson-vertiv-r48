@@ -431,11 +431,12 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
         // Try voltage scaling: 8975 / 100 = 89.75V (too high)
         // Try voltage scaling: 8975 / 200 = 44.875V (close to 48V)
         // Try voltage scaling: 8975 / 187 = 48.0V (perfect!)
+        float parsed_voltage = 0.0f;
         if (val1 > 8000 && val1 < 12000) { // Adjusted range for 48V system
-          float voltage = val1 / 187.0f;  // 8975 / 187 = 48.0V
-          ESP_LOGI(TAG, "Detected voltage: %.2fV (val1=%d)", voltage, val1);
-          if (this->output_voltage_sensor_ != nullptr && !isnan(voltage) && voltage > 0) {
-            this->output_voltage_sensor_->publish_state(voltage);
+          parsed_voltage = val1 / 187.0f;  // 8975 / 187 = 48.0V
+          ESP_LOGI(TAG, "Detected voltage: %.2fV (val1=%d)", parsed_voltage, val1);
+          if (this->output_voltage_sensor_ != nullptr && !isnan(parsed_voltage) && parsed_voltage > 0) {
+            this->output_voltage_sensor_->publish_state(parsed_voltage);
             this->lastUpdate_ = millis(); // Update timestamp to prevent NAN override
           }
         }
@@ -443,13 +444,22 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
         // Try current scaling: 13044 / 1000 = 13.044A (too high)
         // Try current scaling: 13044 / 2000 = 6.522A (still too high)
         // Try current scaling: 13044 / 5000 = 2.61A (perfect for 133-137W at 48V!)
+        float parsed_current = 0.0f;
         if (val2 > 10000 && val2 < 20000) { // Adjusted range for current
-          float current = val2 / 5000.0f;  // 13044 / 5000 = 2.61A
-          ESP_LOGI(TAG, "Detected current: %.2fA (val2=%d)", current, val2);
-          if (this->output_current_sensor_ != nullptr && !isnan(current) && current > 0) {
-            this->output_current_sensor_->publish_state(current);
+          parsed_current = val2 / 5000.0f;  // 13044 / 5000 = 2.61A
+          ESP_LOGI(TAG, "Detected current: %.2fA (val2=%d)", parsed_current, val2);
+          if (this->output_current_sensor_ != nullptr && !isnan(parsed_current) && parsed_current > 0) {
+            this->output_current_sensor_->publish_state(parsed_current);
             this->lastUpdate_ = millis(); // Update timestamp to prevent NAN override
           }
+        }
+        
+        // Calculate power with freshly parsed values
+        if (parsed_voltage > 0 && parsed_current > 0 && this->output_power_sensor_ != nullptr) {
+          float power = parsed_voltage * parsed_current;
+          ESP_LOGI(TAG, "Calculated power with fresh values: %.2fW (%.2fV × %.3fA)", power, parsed_voltage, parsed_current);
+          this->output_power_sensor_->publish_state(power);
+          this->lastUpdate_ = millis(); // Update timestamp for power too
         }
         
         // Try temperature scaling: 193 / 2 = 96.5°C (too hot!)
@@ -497,6 +507,8 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
                   ESP_LOGI(TAG, "Calculated power: %.2fW (%.2fV × %.3fA)", power, voltage, current);
                   this->output_power_sensor_->publish_state(power);
                   this->lastUpdate_ = millis(); // Update timestamp for power too
+                } else {
+                  ESP_LOGW(TAG, "Cannot calculate power: voltage is NAN or zero (%.2fV)", voltage);
                 }
               }
             }
