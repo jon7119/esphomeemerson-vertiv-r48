@@ -59,7 +59,7 @@ void EmersonR48Component::setup() {
   // ESPHome 2025.9+ compatibility: Try alternative approach
   ESP_LOGI(TAG, "Setting up Emerson R48 component for ESPHome 2025.9+");
   ESP_LOGI(TAG, "Attempting to use direct CAN message polling");
-
+  
   this->sendSync();
   this->gimme5();
 }
@@ -161,27 +161,50 @@ void EmersonR48Component::update() {
   }
 
 
-  // DISABLED: no new value for 5* intervall -> set sensors to NAN)
-  // This was causing values to disappear periodically
-  // Now we keep the last known values instead of setting them to NAN
-  /*
+  // Check if charger is OFF (switches ON = charger OFF)
+  // When charger is OFF, set outputs to 0 instead of NAN
   if (millis() - lastUpdate_ > this->update_interval_ * 10 && cnt == 0) {
-    this->publish_sensor_state_(this->input_power_sensor_, NAN);
-    this->publish_sensor_state_(this->input_voltage_sensor_, NAN);
-    this->publish_sensor_state_(this->input_current_sensor_, NAN);
-    this->publish_sensor_state_(this->input_temp_sensor_, NAN);
-    this->publish_sensor_state_(this->input_frequency_sensor_, NAN);
-    this->publish_sensor_state_(this->output_power_sensor_, NAN);
-    this->publish_sensor_state_(this->output_current_sensor_, NAN);
-    this->publish_sensor_state_(this->output_voltage_sensor_, NAN);
-    this->publish_sensor_state_(this->output_temp_sensor_, NAN);
-    this->publish_sensor_state_(this->efficiency_sensor_, NAN);
-    this->publish_number_state_(this->max_output_current_number_, NAN);
+    // Check if AC and DC switches are ON (charger is OFF)
+    bool charger_off = false;
+    if (this->ac_switch_ != nullptr && this->ac_switch_->state) {
+      charger_off = true; // AC switch ON = charger OFF
+    }
+    if (this->dc_switch_ != nullptr && this->dc_switch_->state) {
+      charger_off = true; // DC switch ON = charger OFF  
+    }
+    
+    if (charger_off) {
+      // Charger is OFF: set outputs to 0, keep temperature
+      ESP_LOGI(TAG, "Charger is OFF (switches ON) - setting outputs to 0");
+      this->publish_sensor_state_(this->input_power_sensor_, 0.0f);
+      this->publish_sensor_state_(this->input_voltage_sensor_, 0.0f);
+      this->publish_sensor_state_(this->input_current_sensor_, 0.0f);
+      this->publish_sensor_state_(this->input_frequency_sensor_, 0.0f);
+      this->publish_sensor_state_(this->output_power_sensor_, 0.0f);
+      this->publish_sensor_state_(this->output_current_sensor_, 0.0f);
+      this->publish_sensor_state_(this->output_voltage_sensor_, 0.0f);
+      this->publish_sensor_state_(this->efficiency_sensor_, 0.0f);
+      this->publish_number_state_(this->max_output_current_number_, 0.0f);
+      // Keep temperature sensor unchanged (don't set to 0 or NAN)
+    } else {
+      // Charger is ON but no data: set to NAN (old behavior)
+      ESP_LOGI(TAG, "Charger is ON but no data - setting to NAN");
+      this->publish_sensor_state_(this->input_power_sensor_, NAN);
+      this->publish_sensor_state_(this->input_voltage_sensor_, NAN);
+      this->publish_sensor_state_(this->input_current_sensor_, NAN);
+      this->publish_sensor_state_(this->input_temp_sensor_, NAN);
+      this->publish_sensor_state_(this->input_frequency_sensor_, NAN);
+      this->publish_sensor_state_(this->output_power_sensor_, NAN);
+      this->publish_sensor_state_(this->output_current_sensor_, NAN);
+      this->publish_sensor_state_(this->output_voltage_sensor_, NAN);
+      this->publish_sensor_state_(this->output_temp_sensor_, NAN);
+      this->publish_sensor_state_(this->efficiency_sensor_, NAN);
+      this->publish_number_state_(this->max_output_current_number_, NAN);
+    }
 
     this->sendSync();
     this->gimme5();
   }
-  */
 }
 
 // Function to convert float to byte array
@@ -464,31 +487,6 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
           ESP_LOGI(TAG, "Calculated power with fresh values: %.2fW (%.2fV × %.3fA)", power, parsed_voltage, parsed_current);
           this->output_power_sensor_->publish_state(power);
           this->lastUpdate_ = millis(); // Update timestamp for power too
-        }
-        
-        // Check if charger is ON (switches OFF = charger ON, switches ON = charger OFF)
-        bool charger_on = true;
-        if (this->ac_switch_ != nullptr && this->ac_switch_->state) {
-          charger_on = false; // AC switch ON = charger OFF
-          ESP_LOGI(TAG, "AC switch is ON - charger is OFF, setting outputs to zero");
-        }
-        if (this->dc_switch_ != nullptr && this->dc_switch_->state) {
-          charger_on = false; // DC switch ON = charger OFF
-          ESP_LOGI(TAG, "DC switch is ON - charger is OFF, setting outputs to zero");
-        }
-        
-        // If charger is OFF, set power and current to zero (but keep voltage and temperature)
-        if (!charger_on) {
-          ESP_LOGI(TAG, "Charger is OFF - setting power and current to zero");
-          if (this->output_power_sensor_ != nullptr) {
-            this->output_power_sensor_->publish_state(0.0f);
-            this->lastUpdate_ = millis();
-          }
-          if (this->output_current_sensor_ != nullptr) {
-            this->output_current_sensor_->publish_state(0.0f);
-            this->lastUpdate_ = millis();
-          }
-          // Keep voltage and temperature as they are (don't override them)
         }
         
         // Try temperature scaling: 193 / 2 = 96.5°C (too hot!)
