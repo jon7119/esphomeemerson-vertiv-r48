@@ -469,7 +469,7 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
         // Try temperature scaling: 193 / 2 = 96.5°C (too hot!)
         // Try temperature scaling: 193 / 6 = 32.2°C (more realistic)
         if (val3 > 150 && val3 < 250) { // Adjusted range for temperature
-          float temperature = val3 / 6.0f;  // 193 / 6 = 32.2°C (more realistic)
+          float temperature = val3 / 10.0f;  // 193 / 10 = 19.3°C (closer to 20°C)
           ESP_LOGI(TAG, "Detected temperature: %.1f°C (val3=%d)", temperature, val3);
           if (this->output_temp_sensor_ != nullptr && !isnan(temperature) && temperature > 0) {
             this->output_temp_sensor_->publish_state(temperature);
