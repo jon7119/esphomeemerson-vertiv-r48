@@ -59,7 +59,7 @@ void EmersonR48Component::setup() {
   // ESPHome 2025.9+ compatibility: Try alternative approach
   ESP_LOGI(TAG, "Setting up Emerson R48 component for ESPHome 2025.9+");
   ESP_LOGI(TAG, "Attempting to use direct CAN message polling");
-  
+
   this->sendSync();
   this->gimme5();
 }
@@ -464,6 +464,31 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
           ESP_LOGI(TAG, "Calculated power with fresh values: %.2fW (%.2fV × %.3fA)", power, parsed_voltage, parsed_current);
           this->output_power_sensor_->publish_state(power);
           this->lastUpdate_ = millis(); // Update timestamp for power too
+        }
+        
+        // Check if charger is ON (switches OFF = charger ON, switches ON = charger OFF)
+        bool charger_on = true;
+        if (this->ac_switch_ != nullptr && this->ac_switch_->state) {
+          charger_on = false; // AC switch ON = charger OFF
+          ESP_LOGI(TAG, "AC switch is ON - charger is OFF, setting outputs to zero");
+        }
+        if (this->dc_switch_ != nullptr && this->dc_switch_->state) {
+          charger_on = false; // DC switch ON = charger OFF
+          ESP_LOGI(TAG, "DC switch is ON - charger is OFF, setting outputs to zero");
+        }
+        
+        // If charger is OFF, set power and current to zero (but keep voltage and temperature)
+        if (!charger_on) {
+          ESP_LOGI(TAG, "Charger is OFF - setting power and current to zero");
+          if (this->output_power_sensor_ != nullptr) {
+            this->output_power_sensor_->publish_state(0.0f);
+            this->lastUpdate_ = millis();
+          }
+          if (this->output_current_sensor_ != nullptr) {
+            this->output_current_sensor_->publish_state(0.0f);
+            this->lastUpdate_ = millis();
+          }
+          // Keep voltage and temperature as they are (don't override them)
         }
         
         // Try temperature scaling: 193 / 2 = 96.5°C (too hot!)
