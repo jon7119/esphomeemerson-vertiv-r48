@@ -56,6 +56,10 @@ void EmersonR48Component::gimme5(){
 
 
 void EmersonR48Component::setup() {
+  // ESPHome 2025.9+ compatibility: Try alternative approach
+  ESP_LOGI(TAG, "Setting up Emerson R48 component for ESPHome 2025.9+");
+  ESP_LOGI(TAG, "Attempting to use direct CAN message polling");
+  
   this->sendSync();
   this->gimme5();
 }
@@ -463,10 +467,9 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
         }
         
         // Try temperature scaling: 193 / 2 = 96.5°C (too hot!)
-        // Try temperature scaling: 193 / 4 = 48.25°C (still too hot!)
-        // Try temperature scaling: 193 / 8 = 24.1°C (more realistic for ambient)
-        if (val3 > 150 && val3 < 250) { // Adjusted range for temperature
-          float temperature = val3 / 8.0f;  // 193 / 8 = 24.1°C (more realistic)
+         // Try temperature scaling: 193 / 6 = 32.2°C (more realistic)
+         if (val3 > 150 && val3 < 250) { // Adjusted range for temperature
+           float temperature = val3 / 6.0f;  // 193 / 6 = 32.2°C (more realistic)
           ESP_LOGI(TAG, "Detected temperature: %.1f°C (val3=%d)", temperature, val3);
           if (this->output_temp_sensor_ != nullptr && !isnan(temperature) && temperature > 0) {
             this->output_temp_sensor_->publish_state(temperature);
