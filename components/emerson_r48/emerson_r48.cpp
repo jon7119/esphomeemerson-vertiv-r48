@@ -62,8 +62,8 @@ void EmersonR48Component::setup() {
 
   // Automatically turn ON AC and DC switches on startup
   ESP_LOGI(TAG, "Auto-enabling AC and DC switches on startup");
-  this->set_ac_switch(true);
-  this->set_dc_switch(true);
+  this->acOff_ = false;  // AC switch ON
+  this->dcOff_ = false;  // DC switch ON
 
   this->sendSync();
   this->gimme5();
