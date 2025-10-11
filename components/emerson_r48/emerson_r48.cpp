@@ -56,14 +56,18 @@ void EmersonR48Component::gimme5(){
 
 
 void EmersonR48Component::setup() {
-  // ESPHome 2025.9+ compatibility: Try alternative approach
-  ESP_LOGI(TAG, "Setting up Emerson R48 component for ESPHome 2025.9+");
-  ESP_LOGI(TAG, "Attempting to use direct CAN message polling");
-
+  ESP_LOGI(TAG, "Setting up Emerson R48 component");
+  
   // Automatically turn ON AC and DC switches on startup
   ESP_LOGI(TAG, "Auto-enabling AC and DC switches on startup");
   this->acOff_ = false;  // AC switch ON
   this->dcOff_ = false;  // DC switch ON
+
+  // Register callback for all CAN messages (ESPHome 2025.9+ approach)
+  this->canbus->add_callback([this](uint32_t can_id, bool extended_id, bool rtr, const std::vector<uint8_t> &data) {
+    ESP_LOGV(TAG, "callback canbus id=0x%08X ext=%d rtr=%d size=%d", can_id, extended_id, rtr, (int)data.size());
+    this->on_frame(can_id, rtr, data);
+  });
 
   this->sendSync();
   this->gimme5();
@@ -73,53 +77,11 @@ void EmersonR48Component::update() {
   static uint8_t cnt = 0;
   cnt++;
   
-  // ESPHome 2025.9+ compatibility: Direct CAN message polling
-  // Since on_frame YAML doesn't work with extended IDs, we poll directly
-  ESP_LOGI(TAG, "Update called - Direct CAN polling for ESPHome 2025.9+");
-  
-  // Try to read CAN messages directly from the MCP2515 buffer
-  // This is a workaround for the broken callback system in ESPHome 2025.9+
-  static uint32_t last_can_check = 0;
-  if (millis() - last_can_check > 100) { // Check every 100ms
-    last_can_check = millis();
-    
-    // Attempt to read CAN messages directly
-    // We know messages are being received (we see them in logs)
-    // but the callback system is broken in ESPHome 2025.9+
-    ESP_LOGI(TAG, "Polling for CAN messages from Emerson R48");
-    
-    // ESPHome 2025.9+ workaround: Use patched MCP2515 with public methods
-    ESP_LOGI(TAG, "Using patched MCP2515 driver for direct CAN access");
-    
-    // Cast to MCP2515 to use our new public methods
-    auto* mcp2515 = static_cast<mcp2515::MCP2515*>(this->canbus);
-    if (mcp2515 != nullptr) {
-      // Check if there are messages available using our public method
-      if (mcp2515->check_receive_public()) {
-        ESP_LOGI(TAG, "CAN messages available! Reading REAL data from Emerson R48");
-        
-        // Read the message using our public method
-        struct canbus::CanFrame frame;
-        canbus::Error result = mcp2515->read_message_public(&frame);
-        
-        if (result == canbus::ERROR_OK) {
-          ESP_LOGI(TAG, "Successfully read REAL CAN message: ID=0x%x, DLC=%d", 
-                   frame.can_id, frame.can_data_length_code);
-          
-          // Convert to vector for our parsing function
-          std::vector<uint8_t> data(frame.data, frame.data + frame.can_data_length_code);
-          
-          // Call our parsing function with the REAL data from Emerson R48
-          this->on_frame(frame.can_id, frame.remote_transmission_request, data);
-        } else {
-          ESP_LOGW(TAG, "Failed to read CAN message: %d", result);
-        }
-      } else {
-        ESP_LOGD(TAG, "No CAN messages available");
-      }
-    } else {
-      ESP_LOGW(TAG, "Cannot cast canbus to MCP2515 - wrong driver type");
-    }
+  // Request sensor data periodically
+  if (cnt % 5 == 0) {
+    ESP_LOGD(TAG, "Requesting sensor data");
+    std::vector<uint8_t> data = {0x00, 0xF0, 0x00, 0x80, 0x46, 0xA5, 0x34, 0x00};
+    this->canbus->send_data(CAN_ID_REQUEST, true, data);
   }
 
   if (cnt == 1) {
@@ -382,7 +344,7 @@ void EmersonR48Component::set_control(uint8_t msgv) {
 }
 
 
-void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_t> &data) {
+void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, const std::vector<uint8_t> &data) {
   // ESPHome 2025.9+ compatibility: Mark that callback is working
   static bool callback_working = false;
   if (!callback_working) {
