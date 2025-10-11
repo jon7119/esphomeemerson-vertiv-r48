@@ -60,6 +60,11 @@ void EmersonR48Component::setup() {
   ESP_LOGI(TAG, "Setting up Emerson R48 component for ESPHome 2025.9+");
   ESP_LOGI(TAG, "Attempting to use direct CAN message polling");
 
+  // Automatically turn ON AC and DC switches on startup
+  ESP_LOGI(TAG, "Auto-enabling AC and DC switches on startup");
+  this->set_ac_switch(true);
+  this->set_dc_switch(true);
+
   this->sendSync();
   this->gimme5();
 }
