@@ -64,24 +64,6 @@ void EmersonR48Component::update() {
   static uint8_t cnt = 0;
   cnt++;
   
-  // Check if switches are ON (which means OFF/disabled) - if so, set electrical values to zero but keep temperature
-  if (this->dcOff_ || this->acOff_) {
-    ESP_LOGI(TAG, "Switches are ON (disabled) - setting electrical values to zero (keeping temperature)");
-    if (this->output_voltage_sensor_ != nullptr) {
-      this->output_voltage_sensor_->publish_state(0.0f);
-    }
-    if (this->output_current_sensor_ != nullptr) {
-      this->output_current_sensor_->publish_state(0.0f);
-    }
-    if (this->output_power_sensor_ != nullptr) {
-      this->output_power_sensor_->publish_state(0.0f);
-    }
-    // Temperature sensor keeps its value - don't set to zero
-    // But still process CAN data for temperature
-    this->lastUpdate_ = millis();
-    // Don't return here - continue to process CAN data for temperature
-  }
-  
   // ESPHome 2025.9+ compatibility: Direct CAN message polling
   // Since on_frame YAML doesn't work with extended IDs, we poll directly
   ESP_LOGI(TAG, "Update called - Direct CAN polling for ESPHome 2025.9+");
@@ -397,24 +379,6 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
   if (!callback_working) {
     ESP_LOGI(TAG, "CAN callback is working! ESPHome 2025.9+ compatibility achieved");
     callback_working = true;
-  }
-  
-  // Check if switches are ON (which means OFF/disabled) - if so, set electrical values to zero but keep temperature
-  if (this->dcOff_ || this->acOff_) {
-    ESP_LOGI(TAG, "Switches are ON (disabled) - setting electrical values to zero (keeping temperature)");
-    if (this->output_voltage_sensor_ != nullptr) {
-      this->output_voltage_sensor_->publish_state(0.0f);
-    }
-    if (this->output_current_sensor_ != nullptr) {
-      this->output_current_sensor_->publish_state(0.0f);
-    }
-    if (this->output_power_sensor_ != nullptr) {
-      this->output_power_sensor_->publish_state(0.0f);
-    }
-    // Temperature sensor keeps its value - don't set to zero
-    // But still process CAN data for temperature
-    this->lastUpdate_ = millis();
-    // Don't return here - continue to process CAN data for temperature
   }
   
   // Create a buffer to hold the formatted string
