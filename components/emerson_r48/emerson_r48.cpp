@@ -77,6 +77,17 @@ void EmersonR48Component::update() {
   static uint8_t cnt = 0;
   cnt++;
   
+  // Force AC and DC switches to ON at every update (persistent)
+  if (cnt % 10 == 0) { // Every 10 updates (about every 10 seconds)
+    ESP_LOGI(TAG, "Forcing AC and DC switches to ON (persistent)");
+    this->acOff_ = false;  // AC switch ON
+    this->dcOff_ = false;  // DC switch ON
+    
+    // Send control commands to ensure switches stay ON
+    this->sendSync();
+    this->gimme5();
+  }
+  
   // Request sensor data periodically
   if (cnt % 5 == 0) {
     ESP_LOGD(TAG, "Requesting sensor data");
@@ -444,12 +455,14 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, const std::vector<
           }
         }
         
-        // Check if charger is ON or OFF based on voltage and current
-        // Adjusted thresholds for new data format
-        bool charger_on = (parsed_voltage > 1.0f && parsed_current > 0.1f); // Charger is ON if voltage > 1V and current > 0.1A
+        // Check if charger is ON or OFF based on voltage, current AND switch states
+        // Charger is only ON if both switches are ON AND we have valid voltage/current
+        bool switches_on = (!this->acOff_ && !this->dcOff_); // Both switches must be ON
+        bool charger_on = switches_on && (parsed_voltage > 1.0f && parsed_current > 0.1f);
         
         if (!charger_on) {
-          ESP_LOGI(TAG, "Charger is OFF - setting outputs to zero");
+          ESP_LOGI(TAG, "Charger is OFF - setting outputs to zero (switches: AC=%s, DC=%s)", 
+                   this->acOff_ ? "OFF" : "ON", this->dcOff_ ? "OFF" : "ON");
           // Charger is OFF - set outputs to zero
           if (this->output_voltage_sensor_ != nullptr) {
             this->output_voltage_sensor_->publish_state(0.0f);
