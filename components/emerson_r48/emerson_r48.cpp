@@ -56,16 +56,6 @@ void EmersonR48Component::gimme5(){
 
 
 void EmersonR48Component::setup() {
-  // ESPHome 2025.9+ compatibility: Try IxioJo's callback approach
-  ESP_LOGI(TAG, "Setting up Emerson R48 component for ESPHome 2025.9+");
-  ESP_LOGI(TAG, "Attempting to use IxioJo's callback method");
-  
-  // Try IxioJo's callback approach first
-  this->canbus->add_callback([this](uint32_t can_id, bool extended_id, bool rtr, const std::vector<uint8_t> &data) {
-    ESP_LOGV(TAG, "callback canbus id=0x%08X ext=%d rtr=%d size=%d", can_id, extended_id, rtr, (int)data.size());
-    this->on_frame(can_id, rtr, data);
-  });
-
   this->sendSync();
   this->gimme5();
 }
