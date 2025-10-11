@@ -496,16 +496,17 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
           this->lastUpdate_ = millis(); // Update timestamp for power too
         }
         
-        // Try temperature scaling: 193 / 2 = 96.5°C (too hot!)
-        // Try temperature scaling: 193 / 4 = 48.25°C (still too hot!)
-        // Try temperature scaling: 193 / 8 = 24.1°C (more realistic for ambient)
-        if (val3 > 150 && val3 < 250) { // Adjusted range for temperature
-          float temperature = val3 / 8.0f;  // 193 / 8 = 24.1°C (more realistic)
+        // Try temperature scaling with relaxed conditions
+        ESP_LOGI(TAG, "Temperature parsing: val3=%d (range: 0-255)", val3);
+        if (val3 > 0 && val3 < 255) { // Much more relaxed range for temperature
+          float temperature = val3 / 8.0f;  // Try /8 scaling
           ESP_LOGI(TAG, "Detected temperature: %.1f°C (val3=%d)", temperature, val3);
           if (this->output_temp_sensor_ != nullptr && !isnan(temperature) && temperature > 0) {
             this->output_temp_sensor_->publish_state(temperature);
             this->lastUpdate_ = millis(); // Update timestamp to prevent NAN override
           }
+        } else {
+          ESP_LOGW(TAG, "Temperature val3=%d is out of range (0-255)", val3);
         }
         
         // Also try alternative parsing with different byte positions
@@ -516,6 +517,29 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
           
           ESP_LOGI(TAG, "Alternative parsing: alt_val1=0x%04x (%d), alt_val2=0x%04x (%d)", 
                    alt_val1, alt_val1, alt_val2, alt_val2);
+          
+          // Try temperature from different byte positions
+          uint8_t temp_byte1 = data[6];
+          uint8_t temp_byte2 = data[7];
+          ESP_LOGI(TAG, "Alternative temperature bytes: data[6]=%d, data[7]=%d", temp_byte1, temp_byte2);
+          
+          if (temp_byte1 > 0 && temp_byte1 < 255) {
+            float alt_temp = temp_byte1 / 8.0f;
+            ESP_LOGI(TAG, "Alternative temperature from data[6]: %.1f°C", alt_temp);
+            if (this->output_temp_sensor_ != nullptr) {
+              this->output_temp_sensor_->publish_state(alt_temp);
+              this->lastUpdate_ = millis();
+            }
+          }
+          
+          if (temp_byte2 > 0 && temp_byte2 < 255) {
+            float alt_temp2 = temp_byte2 / 8.0f;
+            ESP_LOGI(TAG, "Alternative temperature from data[7]: %.1f°C", alt_temp2);
+            if (this->output_temp_sensor_ != nullptr) {
+              this->output_temp_sensor_->publish_state(alt_temp2);
+              this->lastUpdate_ = millis();
+            }
+          }
           
           // Try voltage with alternative parsing
           if (alt_val1 > 4000 && alt_val1 < 6000) {
