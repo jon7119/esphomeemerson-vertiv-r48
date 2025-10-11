@@ -59,7 +59,7 @@ void EmersonR48Component::setup() {
   // ESPHome 2025.9+ compatibility: Try alternative approach
   ESP_LOGI(TAG, "Setting up Emerson R48 component for ESPHome 2025.9+");
   ESP_LOGI(TAG, "Attempting to use direct CAN message polling");
-  
+
   this->sendSync();
   this->gimme5();
 }
@@ -436,8 +436,8 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
         // Try voltage scaling: 8975 / 200 = 44.875V (close to 48V)
         // Try voltage scaling: 8975 / 187 = 48.0V (perfect!)
         float parsed_voltage = 0.0f;
-        if (val1 > 8000 && val1 < 12000) { // Adjusted range for 48V system
-          parsed_voltage = val1 / 187.0f;  // 8975 / 187 = 48.0V
+        if (val1 > 10 && val1 < 100) { // Adjusted range for new data format
+          parsed_voltage = val1 * 2.0f;  // 25 * 2 = 50V (close to 48V)
           ESP_LOGI(TAG, "Detected voltage: %.2fV (val1=%d)", parsed_voltage, val1);
           if (this->output_voltage_sensor_ != nullptr && !isnan(parsed_voltage) && parsed_voltage > 0) {
             this->output_voltage_sensor_->publish_state(parsed_voltage);
@@ -449,8 +449,8 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
         // Try current scaling: 13044 / 2000 = 6.522A (still too high)
         // Try current scaling: 13044 / 5000 = 2.61A (perfect for 133-137W at 48V!)
         float parsed_current = 0.0f;
-        if (val2 > 10000 && val2 < 20000) { // Adjusted range for current
-          parsed_current = val2 / 5000.0f;  // 13044 / 5000 = 2.61A
+        if (val2 > 10000 && val2 < 100000) { // Adjusted range for new data format
+          parsed_current = val2 / 20000.0f;  // 56329 / 20000 = 2.82A (close to 2.6A)
           ESP_LOGI(TAG, "Detected current: %.2fA (val2=%d)", parsed_current, val2);
           if (this->output_current_sensor_ != nullptr && !isnan(parsed_current) && parsed_current > 0) {
             this->output_current_sensor_->publish_state(parsed_current);
@@ -467,7 +467,7 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
         }
         
         // Try temperature scaling: 193 / 2 = 96.5°C (too hot!)
-        // Try temperature scaling: 193 / 6 = 32.2°C (more realistic)
+        // Try temperature scaling: 193 / 10 = 19.3°C (closer to 20°C)
         if (val3 > 150 && val3 < 250) { // Adjusted range for temperature
           float temperature = val3 / 10.0f;  // 193 / 10 = 19.3°C (closer to 20°C)
           ESP_LOGI(TAG, "Detected temperature: %.1f°C (val3=%d)", temperature, val3);
@@ -478,7 +478,8 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
         }
         
         // Check if charger is ON or OFF based on voltage and current
-        bool charger_on = (parsed_voltage > 10.0f && parsed_current > 0.1f); // Charger is ON if voltage > 10V and current > 0.1A
+        // Adjusted thresholds for new data format
+        bool charger_on = (parsed_voltage > 1.0f && parsed_current > 0.1f); // Charger is ON if voltage > 1V and current > 0.1A
         
         if (!charger_on) {
           ESP_LOGI(TAG, "Charger is OFF - setting outputs to zero");
