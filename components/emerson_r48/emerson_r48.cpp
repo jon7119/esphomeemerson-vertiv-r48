@@ -161,50 +161,27 @@ void EmersonR48Component::update() {
   }
 
 
-  // Check if charger is OFF (switches ON = charger OFF)
-  // When charger is OFF, set outputs to 0 instead of NAN
+  // DISABLED: no new value for 5* intervall -> set sensors to NAN)
+  // This was causing values to disappear periodically
+  // Now we keep the last known values instead of setting them to NAN
+  /*
   if (millis() - lastUpdate_ > this->update_interval_ * 10 && cnt == 0) {
-    // Check if AC and DC switches are ON (charger is OFF)
-    bool charger_off = false;
-    if (this->ac_switch_ != nullptr && this->ac_switch_->state) {
-      charger_off = true; // AC switch ON = charger OFF
-    }
-    if (this->dc_switch_ != nullptr && this->dc_switch_->state) {
-      charger_off = true; // DC switch ON = charger OFF  
-    }
-    
-    if (charger_off) {
-      // Charger is OFF: set outputs to 0, keep temperature
-      ESP_LOGI(TAG, "Charger is OFF (switches ON) - setting outputs to 0");
-      this->publish_sensor_state_(this->input_power_sensor_, 0.0f);
-      this->publish_sensor_state_(this->input_voltage_sensor_, 0.0f);
-      this->publish_sensor_state_(this->input_current_sensor_, 0.0f);
-      this->publish_sensor_state_(this->input_frequency_sensor_, 0.0f);
-      this->publish_sensor_state_(this->output_power_sensor_, 0.0f);
-      this->publish_sensor_state_(this->output_current_sensor_, 0.0f);
-      this->publish_sensor_state_(this->output_voltage_sensor_, 0.0f);
-      this->publish_sensor_state_(this->efficiency_sensor_, 0.0f);
-      this->publish_number_state_(this->max_output_current_number_, 0.0f);
-      // Keep temperature sensor unchanged (don't set to 0 or NAN)
-    } else {
-      // Charger is ON but no data: set to NAN (old behavior)
-      ESP_LOGI(TAG, "Charger is ON but no data - setting to NAN");
-      this->publish_sensor_state_(this->input_power_sensor_, NAN);
-      this->publish_sensor_state_(this->input_voltage_sensor_, NAN);
-      this->publish_sensor_state_(this->input_current_sensor_, NAN);
-      this->publish_sensor_state_(this->input_temp_sensor_, NAN);
-      this->publish_sensor_state_(this->input_frequency_sensor_, NAN);
-      this->publish_sensor_state_(this->output_power_sensor_, NAN);
-      this->publish_sensor_state_(this->output_current_sensor_, NAN);
-      this->publish_sensor_state_(this->output_voltage_sensor_, NAN);
-      this->publish_sensor_state_(this->output_temp_sensor_, NAN);
-      this->publish_sensor_state_(this->efficiency_sensor_, NAN);
-      this->publish_number_state_(this->max_output_current_number_, NAN);
-    }
+    this->publish_sensor_state_(this->input_power_sensor_, NAN);
+    this->publish_sensor_state_(this->input_voltage_sensor_, NAN);
+    this->publish_sensor_state_(this->input_current_sensor_, NAN);
+    this->publish_sensor_state_(this->input_temp_sensor_, NAN);
+    this->publish_sensor_state_(this->input_frequency_sensor_, NAN);
+    this->publish_sensor_state_(this->output_power_sensor_, NAN);
+    this->publish_sensor_state_(this->output_current_sensor_, NAN);
+    this->publish_sensor_state_(this->output_voltage_sensor_, NAN);
+    this->publish_sensor_state_(this->output_temp_sensor_, NAN);
+    this->publish_sensor_state_(this->efficiency_sensor_, NAN);
+    this->publish_number_state_(this->max_output_current_number_, NAN);
 
     this->sendSync();
     this->gimme5();
   }
+  */
 }
 
 // Function to convert float to byte array
@@ -490,14 +467,36 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
         }
         
         // Try temperature scaling: 193 / 2 = 96.5°C (too hot!)
-         // Try temperature scaling: 193 / 6 = 32.2°C (more realistic)
-         if (val3 > 150 && val3 < 250) { // Adjusted range for temperature
-           float temperature = val3 / 6.0f;  // 193 / 6 = 32.2°C (more realistic)
+        // Try temperature scaling: 193 / 6 = 32.2°C (more realistic)
+        if (val3 > 150 && val3 < 250) { // Adjusted range for temperature
+          float temperature = val3 / 6.0f;  // 193 / 6 = 32.2°C (more realistic)
           ESP_LOGI(TAG, "Detected temperature: %.1f°C (val3=%d)", temperature, val3);
           if (this->output_temp_sensor_ != nullptr && !isnan(temperature) && temperature > 0) {
             this->output_temp_sensor_->publish_state(temperature);
             this->lastUpdate_ = millis(); // Update timestamp to prevent NAN override
           }
+        }
+        
+        // Check if charger is ON or OFF based on voltage and current
+        bool charger_on = (parsed_voltage > 10.0f && parsed_current > 0.1f); // Charger is ON if voltage > 10V and current > 0.1A
+        
+        if (!charger_on) {
+          ESP_LOGI(TAG, "Charger is OFF - setting outputs to zero");
+          // Charger is OFF - set outputs to zero
+          if (this->output_voltage_sensor_ != nullptr) {
+            this->output_voltage_sensor_->publish_state(0.0f);
+          }
+          if (this->output_current_sensor_ != nullptr) {
+            this->output_current_sensor_->publish_state(0.0f);
+          }
+          if (this->output_power_sensor_ != nullptr) {
+            this->output_power_sensor_->publish_state(0.0f);
+          }
+          // Keep temperature as is (don't update it)
+          ESP_LOGI(TAG, "Outputs set to zero, temperature unchanged");
+        } else {
+          ESP_LOGI(TAG, "Charger is ON - using real values");
+          // Charger is ON - use real parsed values (already published above)
         }
         
         // Also try alternative parsing with different byte positions
