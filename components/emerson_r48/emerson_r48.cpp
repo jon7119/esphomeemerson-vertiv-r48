@@ -64,9 +64,9 @@ void EmersonR48Component::update() {
   static uint8_t cnt = 0;
   cnt++;
   
-  // Check if switches are OFF - if so, set electrical values to zero but keep temperature
+  // Check if switches are ON (which means OFF/disabled) - if so, set electrical values to zero but keep temperature
   if (this->dcOff_ || this->acOff_) {
-    ESP_LOGI(TAG, "Switches are OFF - setting electrical values to zero (keeping temperature)");
+    ESP_LOGI(TAG, "Switches are ON (disabled) - setting electrical values to zero (keeping temperature)");
     if (this->output_voltage_sensor_ != nullptr) {
       this->output_voltage_sensor_->publish_state(0.0f);
     }
@@ -78,7 +78,7 @@ void EmersonR48Component::update() {
     }
     // Temperature sensor keeps its value - don't set to zero
     this->lastUpdate_ = millis();
-    return; // Don't process CAN data if switches are OFF
+    return; // Don't process CAN data if switches are ON (disabled)
   }
   
   // ESPHome 2025.9+ compatibility: Direct CAN message polling
@@ -398,9 +398,9 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
     callback_working = true;
   }
   
-  // Check if switches are OFF - if so, set electrical values to zero but keep temperature
+  // Check if switches are ON (which means OFF/disabled) - if so, set electrical values to zero but keep temperature
   if (this->dcOff_ || this->acOff_) {
-    ESP_LOGI(TAG, "Switches are OFF - setting electrical values to zero (keeping temperature)");
+    ESP_LOGI(TAG, "Switches are ON (disabled) - setting electrical values to zero (keeping temperature)");
     if (this->output_voltage_sensor_ != nullptr) {
       this->output_voltage_sensor_->publish_state(0.0f);
     }
@@ -412,7 +412,7 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
     }
     // Temperature sensor keeps its value - don't set to zero
     this->lastUpdate_ = millis();
-    return; // Don't process CAN data if switches are OFF
+    return; // Don't process CAN data if switches are ON (disabled)
   }
   
   // Create a buffer to hold the formatted string
