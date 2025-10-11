@@ -56,10 +56,16 @@ void EmersonR48Component::gimme5(){
 
 
 void EmersonR48Component::setup() {
-  // ESPHome 2025.9+ compatibility: Try alternative approach
+  // ESPHome 2025.9+ compatibility: Try IxioJo's callback approach
   ESP_LOGI(TAG, "Setting up Emerson R48 component for ESPHome 2025.9+");
-  ESP_LOGI(TAG, "Attempting to use direct CAN message polling");
+  ESP_LOGI(TAG, "Attempting to use IxioJo's callback method");
   
+  // Try IxioJo's callback approach first
+  this->canbus->add_callback([this](uint32_t can_id, bool extended_id, bool rtr, const std::vector<uint8_t> &data) {
+    ESP_LOGV(TAG, "callback canbus id=0x%08X ext=%d rtr=%d size=%d", can_id, extended_id, rtr, (int)data.size());
+    this->on_frame(can_id, rtr, data);
+  });
+
   this->sendSync();
   this->gimme5();
 }
@@ -467,9 +473,10 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
         }
         
         // Try temperature scaling: 193 / 2 = 96.5°C (too hot!)
-        // Try temperature scaling: 193 / 4 = 48.25°C (more reasonable)
+        // Try temperature scaling: 193 / 4 = 48.25°C (still too hot!)
+        // Try temperature scaling: 193 / 8 = 24.1°C (more realistic for ambient)
         if (val3 > 150 && val3 < 250) { // Adjusted range for temperature
-          float temperature = val3 / 4.0f;  // 193 / 4 = 48.25°C
+          float temperature = val3 / 8.0f;  // 193 / 8 = 24.1°C (more realistic)
           ESP_LOGI(TAG, "Detected temperature: %.1f°C (val3=%d)", temperature, val3);
           if (this->output_temp_sensor_ != nullptr && !isnan(temperature) && temperature > 0) {
             this->output_temp_sensor_->publish_state(temperature);
