@@ -77,8 +77,9 @@ void EmersonR48Component::update() {
       this->output_power_sensor_->publish_state(0.0f);
     }
     // Temperature sensor keeps its value - don't set to zero
+    // But still process CAN data for temperature
     this->lastUpdate_ = millis();
-    return; // Don't process CAN data if switches are ON (disabled)
+    // Don't return here - continue to process CAN data for temperature
   }
   
   // ESPHome 2025.9+ compatibility: Direct CAN message polling
@@ -411,8 +412,9 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_
       this->output_power_sensor_->publish_state(0.0f);
     }
     // Temperature sensor keeps its value - don't set to zero
+    // But still process CAN data for temperature
     this->lastUpdate_ = millis();
-    return; // Don't process CAN data if switches are ON (disabled)
+    // Don't return here - continue to process CAN data for temperature
   }
   
   // Create a buffer to hold the formatted string
