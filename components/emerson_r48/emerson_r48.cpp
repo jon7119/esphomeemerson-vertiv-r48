@@ -58,10 +58,10 @@ void EmersonR48Component::gimme5(){
 void EmersonR48Component::setup() {
   ESP_LOGI(TAG, "Setting up Emerson R48 component");
   
-  // Automatically turn ON AC and DC switches on startup
-  ESP_LOGI(TAG, "Auto-enabling AC and DC switches on startup");
-  this->acOff_ = false;  // AC switch ON
-  this->dcOff_ = false;  // DC switch ON
+  // Force AC and DC switches to ON on startup (charger OFF to prevent current injection)
+  ESP_LOGI(TAG, "Forcing AC and DC switches to ON on startup - charger will be OFF");
+  this->acOff_ = false;  // AC switch ON = charger AC OFF
+  this->dcOff_ = false;  // DC switch ON = charger DC OFF
 
   // Register callback for all CAN messages (ESPHome 2025.9+ approach)
   this->canbus->add_callback([this](uint32_t can_id, bool extended_id, bool rtr, const std::vector<uint8_t> &data) {
@@ -71,26 +71,19 @@ void EmersonR48Component::setup() {
 
   this->sendSync();
   this->gimme5();
-  
-  // Force switches to ON state immediately after setup
-  ESP_LOGI(TAG, "Forcing switches to ON state (chargeur OFF)");
-  uint8_t msgv = this->dcOff_ << 7 | this->fanFull_ << 4 | this->flashLed_ << 3 | this->acOff_ << 2 | 1;
-  this->set_control(msgv);
 }
 
 void EmersonR48Component::update() {
   static uint8_t cnt = 0;
   cnt++;
   
-  // Force AC and DC switches to ON at every update (persistent)
+  // Force AC and DC switches to ON at every update (persistent - charger OFF)
   if (cnt % 10 == 0) { // Every 10 updates (about every 10 seconds)
-    ESP_LOGI(TAG, "Forcing AC and DC switches to ON (persistent)");
-    this->acOff_ = false;  // AC switch ON
-    this->dcOff_ = false;  // DC switch ON
+    ESP_LOGI(TAG, "Forcing AC and DC switches to ON (persistent) - charger OFF");
+    this->acOff_ = false;  // AC switch ON = charger AC OFF
+    this->dcOff_ = false;  // DC switch ON = charger DC OFF
     
     // Send control commands to ensure switches stay ON
-    uint8_t msgv = this->dcOff_ << 7 | this->fanFull_ << 4 | this->flashLed_ << 3 | this->acOff_ << 2 | 1;
-    this->set_control(msgv);
     this->sendSync();
     this->gimme5();
   }
