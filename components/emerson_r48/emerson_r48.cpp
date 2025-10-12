@@ -78,7 +78,7 @@ void EmersonR48Component::update() {
   cnt++;
   
   // Force AC and DC switches to ON at every update (persistent - charger OFF)
-  if (cnt % 10 == 0) { // Every 10 updates (about every 10 seconds)
+  if (cnt % 1 == 0) { // Every 10 updates (about every 10 seconds)
     ESP_LOGI(TAG, "Forcing AC and DC switches to ON (persistent) - charger OFF");
     this->acOff_ = false;  // AC switch ON = charger AC OFF
     this->dcOff_ = false;  // DC switch ON = charger DC OFF
