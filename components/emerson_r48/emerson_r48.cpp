@@ -78,7 +78,7 @@ void EmersonR48Component::update() {
   cnt++;
   
   // Force AC and DC switches to ON at every update (persistent - charger OFF)
-  if (cnt % 1 == 0) { // Every 10 updates (about every 10 seconds)
+  if (cnt % 10 == 0) { // Every 10 updates (about every 10 seconds)
     ESP_LOGI(TAG, "Forcing AC and DC switches to ON (persistent) - charger OFF");
     this->acOff_ = false;  // AC switch ON = charger AC OFF
     this->dcOff_ = false;  // DC switch ON = charger DC OFF
@@ -456,9 +456,9 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, const std::vector<
         }
         
         // Check if charger is ON or OFF based on voltage, current AND switch states
-        // Charger is only ON if both switches are ON AND we have valid voltage/current
-        bool switches_on = (!this->acOff_ && !this->dcOff_); // Both switches must be ON
-        bool charger_on = switches_on && (parsed_voltage > 1.0f && parsed_current > 0.1f);
+        // Charger is OFF if both switches are ON (switches ON = charger OFF)
+        bool switches_on = (!this->acOff_ && !this->dcOff_); // Both switches are ON
+        bool charger_on = !switches_on && (parsed_voltage > 1.0f && parsed_current > 0.1f); // Charger is ON only if switches are OFF
         
         if (!charger_on) {
           ESP_LOGI(TAG, "Charger is OFF - setting outputs to zero (switches: AC=%s, DC=%s)", 
