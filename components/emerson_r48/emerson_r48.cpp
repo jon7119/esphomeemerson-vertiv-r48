@@ -71,6 +71,11 @@ void EmersonR48Component::setup() {
 
   this->sendSync();
   this->gimme5();
+  
+  // Force switches to ON state immediately after setup
+  ESP_LOGI(TAG, "Forcing switches to ON state (chargeur OFF)");
+  uint8_t msgv = this->dcOff_ << 7 | this->fanFull_ << 4 | this->flashLed_ << 3 | this->acOff_ << 2 | 1;
+  this->set_control(msgv);
 }
 
 void EmersonR48Component::update() {
@@ -84,6 +89,8 @@ void EmersonR48Component::update() {
     this->dcOff_ = false;  // DC switch ON
     
     // Send control commands to ensure switches stay ON
+    uint8_t msgv = this->dcOff_ << 7 | this->fanFull_ << 4 | this->flashLed_ << 3 | this->acOff_ << 2 | 1;
+    this->set_control(msgv);
     this->sendSync();
     this->gimme5();
   }
