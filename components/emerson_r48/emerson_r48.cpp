@@ -72,19 +72,11 @@ void EmersonR48Component::update() {
   static uint8_t cnt = 0;
   cnt++;
   
-  // Check for communication timeout
-  if (millis() - this->lastUpdate_ > 30000) { // 30 seconds without data
-    ESP_LOGW(TAG, "Communication timeout with Emerson R48 - no data for 30s");
-    // Set sensors to indicate communication lost
-    if (this->output_voltage_sensor_ != nullptr) {
-      this->output_voltage_sensor_->publish_state(NAN);
-    }
-    if (this->output_current_sensor_ != nullptr) {
-      this->output_current_sensor_->publish_state(NAN);
-    }
-    if (this->output_power_sensor_ != nullptr) {
-      this->output_power_sensor_->publish_state(NAN);
-    }
+  // Check for communication timeout (only warn, don't set sensors to NAN)
+  if (millis() - this->lastUpdate_ > 60000) { // 60 seconds without data
+    ESP_LOGW(TAG, "Communication timeout with Emerson R48 - no data for 60s");
+    // Don't set sensors to NAN to avoid making them unavailable
+    // The sensors will keep their last known values
   }
   
   // Request sensor data periodically
