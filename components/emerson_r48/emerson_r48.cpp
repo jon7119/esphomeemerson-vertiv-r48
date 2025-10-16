@@ -58,11 +58,6 @@ void EmersonR48Component::gimme5(){
 void EmersonR48Component::setup() {
   ESP_LOGI(TAG, "Setting up Emerson R48 component");
   
-  // Automatically turn ON AC and DC switches on startup
-  ESP_LOGI(TAG, "Auto-enabling AC and DC switches on startup");
-  this->acOff_ = false;  // AC switch ON
-  this->dcOff_ = false;  // DC switch ON
-
   // Register callback for all CAN messages (ESPHome 2025.9+ approach)
   this->canbus->add_callback([this](uint32_t can_id, bool extended_id, bool rtr, const std::vector<uint8_t> &data) {
     ESP_LOGV(TAG, "callback canbus id=0x%08X ext=%d rtr=%d size=%d", can_id, extended_id, rtr, (int)data.size());
@@ -76,6 +71,21 @@ void EmersonR48Component::setup() {
 void EmersonR48Component::update() {
   static uint8_t cnt = 0;
   cnt++;
+  
+  // Check for communication timeout
+  if (millis() - this->lastUpdate_ > 30000) { // 30 seconds without data
+    ESP_LOGW(TAG, "Communication timeout with Emerson R48 - no data for 30s");
+    // Set sensors to indicate communication lost
+    if (this->output_voltage_sensor_ != nullptr) {
+      this->output_voltage_sensor_->publish_state(NAN);
+    }
+    if (this->output_current_sensor_ != nullptr) {
+      this->output_current_sensor_->publish_state(NAN);
+    }
+    if (this->output_power_sensor_ != nullptr) {
+      this->output_power_sensor_->publish_state(NAN);
+    }
+  }
   
   // Request sensor data periodically
   if (cnt % 5 == 0) {
@@ -352,21 +362,19 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, const std::vector<
     callback_working = true;
   }
   
-  // Create a buffer to hold the formatted string
-  // Each byte is represented by two hex digits and a space, +1 for null terminator
+  // Use static buffer to avoid memory allocations
+  static char buffer[25]; // Fixed size for max 8 bytes: 8*3+1 = 25 chars
   size_t length = data.size();
-  char buffer[3 * length + 1];
-
-  // Format the data into the buffer
+  
+  // Format the data into the static buffer
   size_t pos = 0;
-  for (size_t i = 0; i < length; ++i) {
+  for (size_t i = 0; i < length && pos < sizeof(buffer) - 3; ++i) {
       pos += snprintf(buffer + pos, sizeof(buffer) - pos, "%02x ", data[i]);
   }
 
-  // Log the entire line
-  ESP_LOGI(TAG, "received can_message ID=0x%x data: %s", can_id, buffer);
-
+  // Log only relevant messages to reduce log spam
   if (can_id == CAN_ID_DATA || can_id == 0x707f803) {
+    ESP_LOGI(TAG, "received can_message ID=0x%x data: %s", can_id, buffer);
     ESP_LOGI(TAG, "Parsing CAN message ID=0x%x, data[3]=0x%02x", can_id, data[3]);
     
     // Handle status messages (0x707f803) differently from data messages
@@ -405,10 +413,16 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, const std::vector<
         float parsed_voltage = 0.0f;
         if (val1 > 10 && val1 < 100) { // Adjusted range for new data format
           parsed_voltage = val1 * 2.0f;  // 25 * 2 = 50V (close to 48V)
-          ESP_LOGI(TAG, "Detected voltage: %.2fV (val1=%d)", parsed_voltage, val1);
-          if (this->output_voltage_sensor_ != nullptr && !isnan(parsed_voltage) && parsed_voltage > 0) {
-            this->output_voltage_sensor_->publish_state(parsed_voltage);
-            this->lastUpdate_ = millis(); // Update timestamp to prevent NAN override
+          
+          // Validate voltage range (Emerson R48 specs: 41-58.5V)
+          if (parsed_voltage >= 30.0f && parsed_voltage <= 70.0f) {
+            ESP_LOGI(TAG, "Detected voltage: %.2fV (val1=%d)", parsed_voltage, val1);
+            if (this->output_voltage_sensor_ != nullptr && !isnan(parsed_voltage) && parsed_voltage > 0) {
+              this->output_voltage_sensor_->publish_state(parsed_voltage);
+              this->lastUpdate_ = millis(); // Update timestamp to prevent NAN override
+            }
+          } else {
+            ESP_LOGW(TAG, "Invalid voltage value: %.2fV (val1=%d) - outside valid range", parsed_voltage, val1);
           }
         }
         
@@ -418,10 +432,16 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, const std::vector<
         float parsed_current = 0.0f;
         if (val2 > 10000 && val2 < 100000) { // Adjusted range for new data format
           parsed_current = val2 / 20000.0f;  // 56329 / 20000 = 2.82A (close to 2.6A)
-          ESP_LOGI(TAG, "Detected current: %.2fA (val2=%d)", parsed_current, val2);
-          if (this->output_current_sensor_ != nullptr && !isnan(parsed_current) && parsed_current > 0) {
-            this->output_current_sensor_->publish_state(parsed_current);
-            this->lastUpdate_ = millis(); // Update timestamp to prevent NAN override
+          
+          // Validate current range (Emerson R48 specs: 0-62.5A)
+          if (parsed_current >= 0.0f && parsed_current <= 70.0f) {
+            ESP_LOGI(TAG, "Detected current: %.2fA (val2=%d)", parsed_current, val2);
+            if (this->output_current_sensor_ != nullptr && !isnan(parsed_current) && parsed_current >= 0) {
+              this->output_current_sensor_->publish_state(parsed_current);
+              this->lastUpdate_ = millis(); // Update timestamp to prevent NAN override
+            }
+          } else {
+            ESP_LOGW(TAG, "Invalid current value: %.2fA (val2=%d) - outside valid range", parsed_current, val2);
           }
         }
         
