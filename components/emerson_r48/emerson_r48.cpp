@@ -455,8 +455,8 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, const std::vector<
           }
         }
         
-        // Calculate power with freshly parsed values
-        if (parsed_voltage > 0 && parsed_current > 0 && this->output_power_sensor_ != nullptr) {
+        // Calculate power with freshly parsed values (only if charger is ON)
+        if (charger_on && parsed_voltage > 0 && parsed_current > 0 && this->output_power_sensor_ != nullptr) {
           float power = parsed_voltage * parsed_current;
           ESP_LOGI(TAG, "Calculated power with fresh values: %.2fW (%.2fV × %.3fA)", power, parsed_voltage, parsed_current);
           this->output_power_sensor_->publish_state(power);
@@ -492,6 +492,7 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, const std::vector<
           }
           // Keep temperature as is (don't update it)
           ESP_LOGI(TAG, "Outputs set to zero, temperature unchanged");
+          return; // Exit early to prevent alternative parsing from overriding
         } else {
           ESP_LOGI(TAG, "Charger is ON - using real values");
           // Charger is ON - use real parsed values (already published above)
