@@ -66,6 +66,24 @@ void EmersonR48Component::setup() {
 
   this->sendSync();
   this->gimme5();
+  
+  // Initialize sensors with default values to avoid "Unavailable" status
+  ESP_LOGI(TAG, "Initializing sensors with default values");
+  if (this->output_voltage_sensor_ != nullptr) {
+    this->output_voltage_sensor_->publish_state(0.0f);
+  }
+  if (this->output_current_sensor_ != nullptr) {
+    this->output_current_sensor_->publish_state(0.0f);
+  }
+  if (this->output_temp_sensor_ != nullptr) {
+    this->output_temp_sensor_->publish_state(20.0f); // Room temperature
+  }
+  if (this->input_voltage_sensor_ != nullptr) {
+    this->input_voltage_sensor_->publish_state(0.0f);
+  }
+  if (this->max_output_current_sensor_ != nullptr) {
+    this->max_output_current_sensor_->publish_state(0.0f);
+  }
 }
 
 void EmersonR48Component::update() {
