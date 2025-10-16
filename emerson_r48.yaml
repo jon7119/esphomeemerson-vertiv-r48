@@ -1,12 +1,25 @@
 esphome:
-  name: batterie_r48
+  name: emerson-charger
   friendly_name: batterie_r48
-  min_version: 2025.9.1
+  min_version: 2025.10.1
   on_boot:
-    priority: 800.0
+    priority: -100
     then:
-      - delay: 5s
-      - logger.log: "Vérification WiFi au boot"
+      - delay: 100ms
+      - logger.log: "Initialisation terminée, démarrage du bus CAN"
+      - number.set:
+          id: emerson_r48_output_voltage
+          value: 48
+      - number.set:
+          id: emerson_r48_max_output_current
+          value: 10
+      - number.set:
+          id: emerson_r48_max_input_current
+          value: 6
+      - switch.turn_on:
+          id: emerson_r48_ac_sw
+      - switch.turn_on:
+          id: emerson_r48_dc_sw
 
 external_components:
   - source: 
