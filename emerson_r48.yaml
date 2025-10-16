@@ -20,13 +20,6 @@ esphome:
           id: emerson_r48_ac_sw
       - switch.turn_on:
           id: emerson_r48_dc_sw
-      # Initialize sensors with default values to avoid "Unavailable" status
-      - sensor.publish:
-          id: r48_output_voltage
-          state: 0.0
-      - sensor.publish:
-          id: r48_output_current
-          state: 0.0
 
 external_components:
   - source: 
