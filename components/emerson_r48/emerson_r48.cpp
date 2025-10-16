@@ -456,7 +456,6 @@ void EmersonR48Component::on_frame(uint32_t can_id, bool rtr, const std::vector<
         }
         
         // Calculate power with freshly parsed values (only if charger is ON)
-        bool charger_on = (parsed_voltage > 1.0f && parsed_current > 0.1f); // Charger is ON if voltage > 1V and current > 0.1A
         if (charger_on && parsed_voltage > 0 && parsed_current > 0 && this->output_power_sensor_ != nullptr) {
           float power = parsed_voltage * parsed_current;
           ESP_LOGI(TAG, "Calculated power with fresh values: %.2fW (%.2fV × %.3fA)", power, parsed_voltage, parsed_current);
